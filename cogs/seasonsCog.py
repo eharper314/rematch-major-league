@@ -6,6 +6,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from views.seasonsView import CreateSeasonView
+
 # ------------------------------------------
 # Holder for all commands in this Cog
 # ------------------------------------------
@@ -26,13 +28,19 @@ class Seasons(commands.Cog):
         interaction: discord.Interaction
     ):
         # ------------------------------------------
-        # Captures the user's roles
+        # Instant response so no timing out
+        # ------------------------------------------
+        await interaction.response.defer(ephemeral = True)
+        # ------------------------------------------
+        # Sets required variables
         # ------------------------------------------
 
         user_role_ids = [
             role.id
             for role in interaction.user.roles
         ]
+
+        view = CreateSeasonView(self.bot)
         # ------------------------------------------
         # Checks to see if the user has permissions
         # ------------------------------------------
@@ -51,11 +59,13 @@ class Seasons(commands.Cog):
         # Command response
         # ------------------------------------------
 
-        await interaction.response.send_message(
-            "Season command works!",
+        message = await interaction.followup.send(
+            embed = view.build_embed(),
+            view = view,
             ephemeral = True
         )
 
+        view.message = message
 # ------------------------------------------
 # Allows the Cog to be initialized
 # ------------------------------------------

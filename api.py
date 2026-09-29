@@ -116,7 +116,8 @@ def create_season(season: Season):
     # If the database fails for some unknown 
     # reason, then this error raises.
     # ------------------------------------------
-    except DatabaseError:
+    except DatabaseError as e:
+        print("DATABASE ERROR:", e)
         raise HTTPException(
             status_code = 500,
             detail = "A database error has occurred while creating the season."
