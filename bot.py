@@ -3,8 +3,8 @@
 # ------------------------------------------
 
 import os, discord
-from discord import app_commands
 from dotenv import load_dotenv
+from discord.ext import commands
 
 # ------------------------------------------
 # To run the bot locally, run this:
@@ -48,6 +48,8 @@ managerRoles = [managerRoleID, asstManagerRoleID]
 
 intents = discord.Intents.default()
 intents.members = True
+intents.message_content = True
+intents.voice_states = True
 allowed_mentions = discord.AllowedMentions(
     everyone=True,
     users=True,
@@ -55,28 +57,45 @@ allowed_mentions = discord.AllowedMentions(
     replied_user=True
 )
 
-client = discord.Client(intents=intents, allowed_mentions=allowed_mentions)
-tree = app_commands.CommandTree(client)
+bot = commands.Bot(
+    command_prefix = "!",
+    intents = intents,
+    allowed_mentions = allowed_mentions
+)
 
+# ------------------------------------------
+# Making the role IDs accessible to cogs
+# ------------------------------------------
+
+bot.apiURL = apiURL
+
+bot.adminRolID = adminRoleID
+bot.coAdminRoleID = coAdminRoleID
+bot.staffRoleID = staffRoleID
+bot.manager_RoleID = managerRoleID
+bot.asstManagerRoleID = asstManagerRoleID
+
+bot.adminRoles = adminRoles
+bot.staffRoles = staffRoles
+bot.managerRoles = managerRoles
+
+# ------------------------------------------
+# Loads all the cogs into the bot
+# ------------------------------------------
+
+@bot.event
+async def setup_hook():
+    await bot.load_extension("cogs.seasonsCog")
+
+    await bot.tree.sync()
 # ------------------------------------------
 # Bot initialization
 # ------------------------------------------
-@client.event
+@bot.event
 async def on_ready():
-    synced = await tree.sync()
-    print(f"Logged in as {client.user}")
-    print(f"Synced {len(synced)} commands!")
-    print(f"Commands synced: ")
-
-    for command in synced:
-        print(f"- {command.name}")
-
-
-
-
-
+    print(f"Logged in as {bot.user}")
 
 # ------------------------------------------
 # Command for bot to actually run
 # ------------------------------------------
-client.run(botToken)
+bot.run(botToken)
