@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from datetime import date
 from dbconn import get_connection
-from psycopg.errors import CheckViolation
+from psycopg.errors import CheckViolation, DatabaseError
 
 # ------------------------------------------
 # To run the API locally, run this command:
@@ -44,6 +44,12 @@ def root():
 # ------------------------------------------
 @app.post("/season")
 def create_season(season: Season):
+
+    # ------------------------------------------
+    # Attempt to create the season, the 
+    # database already has built in checks.
+    # ------------------------------------------
+
     try:
         with get_connection() as conn:
             with conn.cursor() as cur:
@@ -73,6 +79,11 @@ def create_season(season: Season):
             "message": "Season has been created successfully!",
             "Season ID: ": season_id
         }
+    
+    # ------------------------------------------
+    # Exceptions if a built in check gets
+    # raised from the database.
+    # ------------------------------------------
 
     except CheckViolation as e:
         constraint = e.diag.constraint_name
@@ -88,6 +99,11 @@ def create_season(season: Season):
                 "Free agent period cannot end after the season ends."
         }
 
+    # ------------------------------------------
+    # If something goes wrong with the
+    # check-specific rules, this message pops.
+    # ------------------------------------------
+
         raise HTTPException(
             status_code = 400,
             detail = messages.get(
@@ -95,3 +111,16 @@ def create_season(season: Season):
                 "Season violates a database rule."
                 )
         )
+
+    # ------------------------------------------
+    # If the database fails for some unknown 
+    # reason, then this error raises.
+    # ------------------------------------------
+    except DatabaseError:
+        raise HTTPException(
+            status_code = 500,
+            detail = "A database error has occurred while creating the season."
+        )
+
+
+
