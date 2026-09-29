@@ -28,10 +28,6 @@ class Seasons(commands.Cog):
         interaction: discord.Interaction
     ):
         # ------------------------------------------
-        # Instant response so no timing out
-        # ------------------------------------------
-        await interaction.response.defer(ephemeral = True)
-        # ------------------------------------------
         # Sets required variables
         # ------------------------------------------
 
@@ -54,6 +50,12 @@ class Seasons(commands.Cog):
                 ephemeral = True
             )
             return
+
+        # ------------------------------------------
+        # Instant response so no timing out
+        # ------------------------------------------
+        
+        await interaction.response.defer(ephemeral = True)
 
         # ------------------------------------------
         # Command response
