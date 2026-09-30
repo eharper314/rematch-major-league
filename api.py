@@ -35,6 +35,7 @@ class Season(BaseModel):
 # ------------------------------------------
 # Starting endpoint for health check
 # ------------------------------------------
+
 @app.get("/")
 def root():
     return {"message": "RML API is up and running"}
@@ -42,6 +43,7 @@ def root():
 # ------------------------------------------
 # Endpoint to create a season in RML
 # ------------------------------------------
+
 @app.post("/season")
 def create_season(season: Season):
 
@@ -123,5 +125,79 @@ def create_season(season: Season):
             detail = "A database error has occurred while creating the season."
         )
 
+# ------------------------------------------
+# Endpoint to view the list of 
+# seasons in RML.
+# ------------------------------------------
 
+@app.get("/season")
+def list_seasons():
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    season_id,
+                    season_name,
+                    start_date,
+                    end_date,
+                    free_agent_start,
+                    free_agent_end
+                FROM seasons
+                ORDER BY start_date ASC;
+                """
+            )
 
+            rows = cur.fetchall()
+
+    return [
+        {
+            "season_id": row[0],
+            "season_name": row[1],
+            "start_date": row[2],
+            "end_date": row[3],
+            "free_agent_start": row[4],
+            "free_agent_end": row[5]
+        }
+        for row in rows
+    ]
+
+# ------------------------------------------
+# Endpoint to get a specific season in RML.
+# ------------------------------------------
+
+@app.get("/season/{season_id}")
+def get_season(season_id: int):
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    season_id,
+                    season_name,
+                    start_date,
+                    end_date,
+                    free_agent_start,
+                    free_agent_end
+                FROM seasons
+                WHERE season_id = %s;
+                """,
+                (season_id,)
+            )
+
+            row = cur.fetchone()
+
+    if row is None:
+        raise HTTPException(
+            status_code = 404,
+            detail = "Season not found."
+        )
+
+    return {
+        "season_id": row[0],
+        "season_name": row[1],
+        "start_date": row[2],
+        "end_date": row[3],
+        "free_agent_start": row[4],
+        "free_agent_end": row[5]      
+    }
