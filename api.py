@@ -201,3 +201,6 @@ def get_season(season_id: int):
         "free_agent_start": row[4],
         "free_agent_end": row[5]      
     }
+
+
+

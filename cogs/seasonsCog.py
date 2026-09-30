@@ -2,11 +2,14 @@
 # Imports for all needed libraries/packages
 # ------------------------------------------
 
-import discord
+import discord, aiohttp
 from discord import app_commands
 from discord.ext import commands
 
-from views.seasonsView import CreateSeasonView
+from views.seasonsView import CreateSeasonView, SeasonListView
+from views.seasonsView import (
+    build_single_season_embed
+)
 
 # ------------------------------------------
 # Holder for all commands in this Cog
@@ -16,9 +19,10 @@ class Seasons(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-# ------------------------------------------
-# Command for creating a season in RML
-# ------------------------------------------
+    # ------------------------------------------
+    # Command for creating a season in RML
+    # ------------------------------------------
+
     @app_commands.command(
         name = "create_season",
         description = "ADMIN COMMAND: Creates a season for RML."
@@ -68,6 +72,73 @@ class Seasons(commands.Cog):
         )
 
         view.message = message
+
+    # ------------------------------------------
+    # Command for viewing a season
+    # ------------------------------------------
+
+    @app_commands.command(
+        name = "view_season",
+        description = "GENERAL COMMAND: Allows you to view a list of season, or one specific season."
+    )
+    async def view_season(
+        self,
+        interaction: discord.Interaction,
+        season_id: int | None = None
+    ):
+        await interaction.response.defer(ephemeral = False)
+
+        async with aiohttp.ClientSession() as session:
+
+            # ------------------------------------------
+            # Command to get the full list.
+            # ------------------------------------------
+
+            if season_id is None:
+                url = f"{self.bot.apiURL}/season"
+
+            # ------------------------------------------
+            # Command to get a specific season
+            # ------------------------------------------
+            
+            else:
+                url = f"{self.bot.apiURL}/season/{season_id}"
+
+            async with session.get(url) as response:
+
+                data = await response.json()
+
+                if response.status != 200:
+                    await interaction.followup.send(
+                        data.get(
+                            "detail",
+                            "Something went wrong."
+                        ),
+                        ephemeral = True
+                    )
+                    return
+
+            # ------------------------------------------
+            # Response for givine a list
+            # ------------------------------------------
+
+            if season_id is None:
+                view = SeasonListView(data)
+
+                await interaction.followup.send(
+                    embed = view.build_embed(),
+                    view = view
+                )
+
+            # ------------------------------------------
+            # Specific season response
+            # ------------------------------------------
+            else:
+                embed = build_single_season_embed(data)
+
+                await interaction.followup.send(
+                    embed = embed
+                )
 
 
 # ------------------------------------------

@@ -445,18 +445,29 @@ class CreateSeasonView(discord.ui.View):
     # ------------------------------------------
     # Initialization of the class
     # ------------------------------------------
-    def __init__(self, bot):
+    def __init__(
+        self,
+        bot,
+        season_id = None,
+        season_name = None,
+        start_date = None,
+        end_date = None,
+        free_agent_start = None,
+        free_agent_end = None
+    ):
         super().__init__(timeout = 300)
 
         self.bot = bot
 
-        self.season_name = None
-        self.start_date = None
-        self.end_date = None
-        self.free_agent_start = None
-        self.free_agent_end = None
+        self.season_id = season_id
+        self.season_name = season_name
+        self.start_date = start_date
+        self.end_date = end_date
+        self.free_agent_start = free_agent_start
+        self.free_agent_end = free_agent_end
 
-        self.message = None
+        if self.season_id is not None:
+            self.confirm_create_season.label = "Update Season"
 
     # ------------------------------------------
     # Funtion to edit the date format
@@ -475,8 +486,13 @@ class CreateSeasonView(discord.ui.View):
 
     def build_embed(self):
 
+        if self.season_id is None:
+            title = "Create a Season"
+        else:
+            title = "Update a Season"
+
         embed = discord.Embed(
-            title = "Create a Season",
+            title = title,
             description = "Set each field down below, then create the season."
         )
         # ------------------------------------------
