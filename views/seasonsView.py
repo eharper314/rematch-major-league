@@ -770,3 +770,172 @@ class CreateSeasonView(discord.ui.View):
             embed = None,
             view = None
         )
+
+# ------------------------------------------
+# Embed for seeing a list of seasons in RML
+# ------------------------------------------
+
+class SeasonListView(discord.ui.View):
+    # ------------------------------------------
+    # Class initializaton
+    # ------------------------------------------
+
+    def __init__(self, seasons, per_page = 5):
+        super().__init__(timeout = 300)
+
+        self.seasons = seasons
+        self.per_page = per_page
+        self.current_page = 0
+
+        self.total_pages = max(
+            1,
+            (len(seasons) + per_page - 1) // per_page
+        )
+
+        self.update_buttons()
+
+    # ------------------------------------------
+    # Building the embed
+    # ------------------------------------------
+
+    def build_embed(self):
+        start = self.current_page * self.per_page
+        end = start + self.per_page
+
+        page_seasons = self.seasons[start:end]
+
+        embed = discord.Embed(
+            title = "RML Seasons",
+            description = (
+                f"Page {self.current_page + 1} "
+                f"of {self.total_pages}"
+            )
+        )
+        # ------------------------------------------
+        # If there are no seasons
+        # ------------------------------------------
+
+        if not page_seasons:
+            embed.description = "No seasons are currently available."
+            return embed
+
+        # ------------------------------------------
+        # Handles the formatting for each season.
+        # ------------------------------------------
+
+        for season in page_seasons:
+            embed.add_field(
+                name = (
+                    f"{season['season_name']} "
+                    f"- ID {season['season_id']}"
+                ),
+                value = (
+                    f"**Start:** {season['start_date']}\n"
+                    f"**End:** {season['end_date']}\n"
+                    f"**Free Agent:** "
+                    f"{season['free_agent_start']} → "
+                    f"{season['free_agent_end']}"
+                ),
+                inline = False
+            )
+
+        return embed
+
+    # ------------------------------------------
+    # Updates the button each time
+    # ------------------------------------------
+
+    def update_buttons(self):
+        self.previous_button.disabled = (
+            self.current_page == 0
+        )
+
+        self.next_button.disabled = (
+            self.current_page >= self.total_pages - 1
+        )
+
+    # ------------------------------------------
+    # Button for Previous Page
+    # ------------------------------------------
+
+    @discord.ui.button(
+        label = "Previous",
+        style = discord.ButtonStyle.secondary
+    )
+    async def previous_button(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        if self.current_page > 0:
+            self.current_page -= 1
+
+        self.update_buttons()
+
+        await interaction.response.edit_message(
+            embed = self.build_embed(),
+            view = self
+        )
+
+    # ------------------------------------------
+    # Button for Next page
+    # ------------------------------------------
+    @discord.ui.button(
+        label = "Next",
+        style = discord.ButtonStyle.secondary
+    )
+    async def next_button(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        if self.current_page < self.total_pages - 1:
+            self.current_page += 1
+
+        self.update_buttons()
+
+        await interaction.response.edit_message(
+            embed = self.build_embed(),
+            view = self
+        )
+
+# ------------------------------------------
+# Embed for seeing a specific season in RML.
+# ------------------------------------------
+
+def build_single_season_embed(season):
+    embed = discord.Embed(
+        title = season["season_name"]
+    )
+
+    embed.add_field(
+        name = "Season ID",
+        value = season["season_id"],
+        inline = False
+    )
+
+    embed.add_field(
+        name = "Start Date",
+        value = season["start_date"],
+        inline = True
+    )
+
+    embed.add_field(
+        name ="End Date",
+        value = season["end_date"],
+        inline = True
+    )
+
+    embed.add_field(
+        name = "Free Agent Start",
+        value = season["free_agent_start"],
+        inline = True
+    )
+
+    embed.add_field(
+        name = "Free Agent End",
+        value = season["free_agent_end"],
+        inline = True
+    )
+
+    return embed
