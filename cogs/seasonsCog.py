@@ -54,7 +54,7 @@ class Seasons(commands.Cog):
         # ------------------------------------------
         # Instant response so no timing out
         # ------------------------------------------
-        
+
         await interaction.response.defer(ephemeral = True)
 
         # ------------------------------------------
@@ -68,6 +68,8 @@ class Seasons(commands.Cog):
         )
 
         view.message = message
+
+
 # ------------------------------------------
 # Allows the Cog to be initialized
 # ------------------------------------------
