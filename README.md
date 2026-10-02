@@ -36,7 +36,8 @@ The RML website is where you can see all related information with RML, included 
 While v1 has already been released, the programming was rushed, and so this is where the programming can be organized, edited, and correctly monitored.
 
 ### Discord Bot/API
-- [ ] Create season start/management commands and endpoints
+- [x] Create season start/management commands and endpoints
+    - [ ] Create league creation/management commands and endpoints
 - [ ] Create player registration commands, endpoints, and embeds
 - [ ] Create team registration/management commands, endpoints, and embeds
 - [ ] Create discord ticket system
