@@ -713,34 +713,47 @@ class CreateSeasonView(discord.ui.View):
         try:
 
             async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self.bot.apiURL}/season",
-                    json = payload
-                ) as response:
 
-                    data = await response.json()
+                # ------------------------------------------
+                # Checks to see if it's in create mode or
+                # update mode for the bot.
+                # ------------------------------------------
 
-                    if response.status == 200:
-                        self.stop()
+                if self.season_id is None:
+                    async with session.post(
+                        f"{self.bot.apiURL}/season",
+                        json = payload
+                    ) as response:
+                        data = await response.json()
 
-                        success_embed = discord.Embed(
-                            title = "Season Created",
-                            description = (f"**{self.season_name}** was created successfully.")
-                        )
+                else:
+                    async with session.patch(
+                        f"{self.bot.apiURL}/season/{self.season_id}",
+                        json = payload
+                    ) as response:
+                        data = await response.json()
 
-                        await interaction.edit_original_response(
-                            embed = success_embed,
-                            view = None
-                        )
-                        return
+                if response.status == 200:
+                    self.stop()
 
-                    await interaction.followup.send(
-                        data.get(
-                            "detail",
-                            "Something went wrong while creating the season."
-                        ),
-                        ephemeral = True
+                    success_embed = discord.Embed(
+                        title = "Season Created",
+                        description = (f"**{self.season_name}** was created successfully.")
                     )
+
+                    await interaction.edit_original_response(
+                        embed = success_embed,
+                        view = None
+                    )
+                    return
+
+                await interaction.followup.send(
+                    data.get(
+                        "detail",
+                        "Something went wrong while creating the season."
+                    ),
+                    ephemeral = True
+                )
         except aiohttp.ClientError:
             await interaction.followup.send(
                 "Could not connect to the RML API.",
