@@ -202,5 +202,90 @@ def get_season(season_id: int):
         "free_agent_end": row[5]      
     }
 
+# ------------------------------------------
+# Endpoint to update a season in RML.
+# ------------------------------------------
 
+@app.patch("/season/{season_id}")
+def update_season(season_id: int, season: Season):
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE seasons
+                    SET
+                        season_name = %s,
+                        start_date = %s,
+                        end_date = %s,
+                        free_agent_start = %s,
+                        free_agent_end = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE season_id = %s
+                    RETURNING season_id;                    
+                    """,
+                    (
+                    season.season_name,
+                    season.start_date,
+                    season.end_date,
+                    season.free_agent_start,
+                    season.free_agent_end,
+                    season_id
+                    )  
+                )
+                updated_season = cur.fetchone()
+
+                # ------------------------------------------
+                # If the requested season doesn't exist,
+                # then this pops.
+                # ------------------------------------------
+
+                if updated_season is None:
+                    raise HTTPException(
+                        status_code = 404,
+                        detail = "Season not found."
+                    )
+
+        return {
+            "message": "Season has been updated successfully!"
+        }
+              
+    except CheckViolation as e:
+        constraint = e.diag.constraint_name
+
+        messages = {
+            "valid_season_dates":
+                "Season end date must be on or after the season start date.",
+            "valid_free_agent_dates":
+                "Free agent end date must be on or after the free agent start date.",
+            "free_agent_after_season_start":
+                "Free agent period cannot begin before the season starts.",
+            "free_agent_before_season_end":
+                "Free agent period cannot end after the season ends."
+        }
+
+    # ------------------------------------------
+    # If something goes wrong with the
+    # check-specific rules, this message pops.
+    # ------------------------------------------
+
+        raise HTTPException(
+            status_code = 400,
+            detail = messages.get(
+                constraint, 
+                "Season violates a database rule."
+                )
+        )
+
+    # ------------------------------------------
+    # If the database fails for some unknown 
+    # reason, then this error raises.
+    # ------------------------------------------
+    except DatabaseError as e:
+        print("DATABASE ERROR:", e)
+        raise HTTPException(
+            status_code = 500,
+            detail = "A database error has occurred while updating the season."
+        )
 
