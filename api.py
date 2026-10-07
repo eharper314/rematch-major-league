@@ -311,7 +311,7 @@ def update_season(season_id: int, season: Season):
 # Endpoint to create a league in RML.
 # ------------------------------------------
 
-@app.post("/season/{season_id}/league")
+@app.post("/season/{season_id}/leagues")
 def create_league(season_id: int, league: League):
 
     # ------------------------------------------

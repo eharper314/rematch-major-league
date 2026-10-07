@@ -21,7 +21,7 @@ class Leagues(commands.Cog):
     # Command for creating a league in RML
     # ------------------------------------------
 
-    @app_commands.commands(
+    @app_commands.command(
         name = "create_league",
         description = "ADMIN COMMAND: Creates a league for RML."
     )
@@ -71,7 +71,7 @@ class Leagues(commands.Cog):
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{self.bot.apiURL}/seasons/{season_id}/leagues",
+                f"{self.bot.apiURL}/season/{season_id}/leagues",
                 json = payload
             ) as response:
 
@@ -88,8 +88,15 @@ class Leagues(commands.Cog):
                     return
 
         await interaction.followup.send(
-            f" League **{league_name} was created successfully!",
+            f" League **{league_name}** was created successfully!",
             ephemeral = True
         )
 
 
+
+# ------------------------------------------
+# Allows the Cog to be initialized
+# ------------------------------------------
+
+async def setup(bot):
+    await bot.add_cog(Leagues(bot))
