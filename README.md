@@ -16,7 +16,7 @@ The RML API is used to handle all database-related communication for both the we
 * Link: TBD
 
 ## Discord bot
-The RML discord bot is made to handle daily operations in the [RML Official Discord](https://discord.gg/VFAJTEcbME), allowing staff, teams, and players to handle most operations needed in order for RML to run smoothly. Programmed and maintained by Vibe, the bot is consistently monitored and updated as it's called for.
+The RML discord bot is made to handle daily operations in the [RML Official Discord](https://discord.gg/rematchmajorleague), allowing staff, teams, and players to handle most operations needed in order for RML to run smoothly. Programmed and maintained by Vibe, the bot is consistently monitored and updated as it's called for.
 
 There are three command level clearances:
 
