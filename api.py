@@ -213,7 +213,7 @@ def get_season(season_id: int):
                     league_name
                 FROM leagues
                 WHERE season_id = %s
-                ORDER BY league_name;
+                ORDER BY league_id;
                 """,
                 (season_id,)
             )

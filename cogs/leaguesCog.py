@@ -92,7 +92,7 @@ class Leagues(commands.Cog):
         )
 
     # ------------------------------------------
-    # Command for updated a league in RML
+    # Command for updating a league in RML
     # ------------------------------------------
 
     @app_commands.command(
@@ -105,6 +105,8 @@ class Leagues(commands.Cog):
         league_id: int,
         league_name: str
     ):
+        
+        # ------------------------------------------
         # Sets required variables
         # ------------------------------------------
 
