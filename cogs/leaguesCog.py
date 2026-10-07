@@ -5,7 +5,6 @@
 import discord, aiohttp
 from discord import app_commands
 from discord.ext import commands
-from datetime import date
 
 
 
@@ -92,7 +91,79 @@ class Leagues(commands.Cog):
             ephemeral = True
         )
 
+    # ------------------------------------------
+    # Command for updated a league in RML
+    # ------------------------------------------
 
+    @app_commands.command(
+        name = "update_league",
+        description = "ADMIN COMMAND: Updates a league in RML."
+    )
+    async def update_league(
+        self,
+        interaction: discord.Interaction,
+        league_id: int,
+        league_name: str
+    ):
+        # Sets required variables
+        # ------------------------------------------
+
+        user_role_ids = [
+            role.id
+            for role in interaction.user.roles
+        ]
+
+        # ------------------------------------------
+        # Checks to see if the user has permissions
+        # ------------------------------------------
+
+        if not any(
+            role_id in self.bot.adminRoles
+            for role_id in user_role_ids
+        ):
+            await interaction.response.send_message(
+                "You do not have permission to use this command.",
+                ephemeral = True
+            )
+            return
+
+        # ------------------------------------------
+        # Instant response so no timing out
+        # ------------------------------------------
+
+        await interaction.response.defer(ephemeral = True)
+
+        # ------------------------------------------
+        # Command response
+        # ------------------------------------------
+
+        payload = {
+            "league_name": league_name
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.patch(
+                f"{self.bot.apiURL}/league/{league_id}",
+                json = payload
+            ) as response:
+
+                data = await response.json()
+
+                if response.status != 200:
+                    await interaction.followup.send(
+                        data.get(
+                            "detail",
+                            "Something went wrong while updating the league."
+                        ),
+                        ephemeral = True
+                    )
+                    return
+
+        await interaction.followup.send(
+            f" League **{league_name}** was updated successfully!",
+            ephemeral = True
+        )
+        
 
 # ------------------------------------------
 # Allows the Cog to be initialized

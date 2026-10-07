@@ -147,7 +147,7 @@ class Seasons(commands.Cog):
 
     @app_commands.command(
         name = "update_season",
-        description = "Update an existing season."
+        description = "ADMIN COMMAND: Update an existing season."
     )
     async def update_season(
         self,
