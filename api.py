@@ -396,5 +396,72 @@ def create_league(season_id: int, league: League):
             detail = "A database error has occurred while creating the league."
         )
 
+# ------------------------------------------
+# Endpoint to update a league in RML.
+# ------------------------------------------
 
+@app.patch("/league/{league_id}")
+def update_league(league_id: int, league: League):
+
+    # ------------------------------------------
+    # Attempts to update a league
+    # ------------------------------------------
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE leagues
+                    SET
+                        league_name = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE league_id = %s
+                    RETURNING league_id;
+                    """,
+                    (
+                        league.league_name,
+                        league_id
+                    )
+                )
+
+                updated_league = cur.fetchone()
+
+
+                # ------------------------------------------
+                # Pops if the league ID isn't found
+                # ------------------------------------------
+
+                if updated_league is None:
+                    raise HTTPException(
+                        status_code = 404,
+                        detail = "That specified league does not exist."
+                    )
+        return {
+            "message": "League has been updated successfully.",
+            "league_id": updated_league[0]
+        }
+
+    # ------------------------------------------
+    # Pops if you try to update a league
+    # with the same name within the same season.
+    # ------------------------------------------
+
+    except UniqueViolation:
+        raise HTTPException(
+            status_code = 409,
+            detail = "A league with that name already exists in this season."
+        )
+
+    # ------------------------------------------
+    # Other errors not specifically caught
+    # ------------------------------------------
+
+    except DatabaseError as e:
+        print("DATABASE ERROR:", e)
+
+        raise HTTPException(
+            status_code = 500,
+            detail = "A database error has occurred while creating the league."
+        )
 
