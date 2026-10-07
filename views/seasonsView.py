@@ -5,11 +5,9 @@
 import aiohttp, discord, calendar
 from datetime import date
 
-
 # ------------------------------------------
 # All Modals
 # ------------------------------------------
-
 
 class SeasonNameModal(discord.ui.Modal):
     def __init__(self, season_view):
@@ -433,7 +431,6 @@ class DatePickerView(discord.ui.View):
         )
 
         self.stop()
-
 
 # ------------------------------------------
 # Embed for creating a season
@@ -928,27 +925,37 @@ def build_single_season_embed(season):
     )
 
     embed.add_field(
-        name = "Start Date",
-        value = season["start_date"],
-        inline = True
+        name = "Season Dates",
+        value = (
+            f"**Start:** {season['start_date']}\n"
+            f"**End:** {season['end_date']}"
+        ),
+        inline = False
     )
 
     embed.add_field(
-        name ="End Date",
-        value = season["end_date"],
-        inline = True
+        name = "Free Agent Dates",
+        value = (
+            f"**Start:** {season['free_agent_start']}\n"
+            f"**End:** {season['free_agent_end']}"
+        ),
+        inline = False
     )
 
-    embed.add_field(
-        name = "Free Agent Start",
-        value = season["free_agent_start"],
-        inline = True
-    )
+    leagues = season.get("leagues", [])
+
+    if leagues:
+        league_text = "\n".join(
+            f"**{league['league_name']}** — ID {league['league_id']}"
+            for league in leagues
+        )
+    else:
+        league_text = "No leagues have been created for this season."
 
     embed.add_field(
-        name = "Free Agent End",
-        value = season["free_agent_end"],
-        inline = True
+        name = "Leagues",
+        value = league_text,
+        inline = False
     )
 
     return embed

@@ -218,11 +218,6 @@ class Seasons(commands.Cog):
         )
 
         view.message = message
-
-
-
-
-
     
 # ------------------------------------------
 # Allows the Cog to be initialized
