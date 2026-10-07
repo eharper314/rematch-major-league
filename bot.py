@@ -86,6 +86,7 @@ bot.managerRoles = managerRoles
 @bot.event
 async def setup_hook():
     await bot.load_extension("cogs.seasonsCog")
+    await bot.load_extension("cogs.leaguesCog")
 
     await bot.tree.sync()
 # ------------------------------------------
