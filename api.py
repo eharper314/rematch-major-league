@@ -3,10 +3,10 @@
 # ------------------------------------------
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import date
 from dbconn import get_connection
-from psycopg.errors import CheckViolation, DatabaseError
+from psycopg.errors import CheckViolation, DatabaseError, ForeignKeyViolation, UniqueViolation
 
 # ------------------------------------------
 # To run the API locally, run this command:
@@ -31,6 +31,8 @@ class Season(BaseModel):
     free_agent_start: date | None = None
     free_agent_end: date | None = None
 
+class League(BaseModel):
+    league_name: str = Field(min_length = 1, max_length = 100)
 
 # ------------------------------------------
 # Starting endpoint for health check
@@ -132,6 +134,11 @@ def create_season(season: Season):
 
 @app.get("/season")
 def list_seasons():
+
+    # ------------------------------------------
+    # Pulls all seasons in the database
+    # ------------------------------------------
+
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -168,6 +175,12 @@ def list_seasons():
 
 @app.get("/season/{season_id}")
 def get_season(season_id: int):
+
+    # ------------------------------------------
+    # Pulls one specific season from the 
+    # database.
+    # ------------------------------------------
+
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -208,6 +221,11 @@ def get_season(season_id: int):
 
 @app.patch("/season/{season_id}")
 def update_season(season_id: int, season: Season):
+
+    # ------------------------------------------
+    # Attempts to update a season in the 
+    # database.
+    # ------------------------------------------
 
     try:
         with get_connection() as conn:
@@ -288,4 +306,74 @@ def update_season(season_id: int, season: Season):
             status_code = 500,
             detail = "A database error has occurred while updating the season."
         )
+
+# ------------------------------------------
+# Endpoint to create a league in RML.
+# ------------------------------------------
+
+@app.post("/season/{season_id}/league")
+def create_league(season_id: int, league: League):
+
+    # ------------------------------------------
+    # Attempts to create a league
+    # ------------------------------------------
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO leagues (
+                        season_id,
+                        league_name
+                    )
+                    VALUES (%s, %s)
+                    RETURNING league_id;
+                    """,
+                    (
+                        season_id,
+                        league.league_name
+                    )
+                )
+
+                league_id = cur.fetchone()[0]
+
+        return {
+            "message": "League has been created successfully!",
+            "league_id": league_id
+        }
+
+    # ------------------------------------------
+    # Pops if the season_id isn't found
+    # ------------------------------------------
+
+    except ForeignKeyViolation:
+        raise HTTPException(
+            status_code = 404,
+            detail = "The specified season does not exist."
+        )
+
+    # ------------------------------------------
+    # Pops if you try to create a league
+    # with the same name within the same season.
+    # ------------------------------------------
+
+    except UniqueViolation:
+        raise HTTPException(
+            status_code = 409,
+            detail = "A league with that name already exists in this season."
+        )
+
+    # ------------------------------------------
+    # Other errors not specifically caught
+    # ------------------------------------------
+
+    except DatabaseError as e:
+        print("DATABASE ERROR:", e)
+
+        raise HTTPException(
+            status_code = 500,
+            detail = "A database error has occurred while creating the league."
+        )
+
+
 
