@@ -198,21 +198,42 @@ def get_season(season_id: int):
                 (season_id,)
             )
 
-            row = cur.fetchone()
+            season = cur.fetchone()
 
-    if row is None:
-        raise HTTPException(
-            status_code = 404,
-            detail = "Season not found."
-        )
+            if season is None:
+                raise HTTPException(
+                    status_code = 404,
+                    detail = "Season not found."
+                )
+
+            cur.execute(
+                """
+                SELECT
+                    league_id,
+                    league_name
+                FROM leagues
+                WHERE season_id = %s
+                ORDER BY league_name;
+                """,
+                (season_id,)
+            )
+
+            leagues = cur.fetchall()
 
     return {
-        "season_id": row[0],
-        "season_name": row[1],
-        "start_date": row[2],
-        "end_date": row[3],
-        "free_agent_start": row[4],
-        "free_agent_end": row[5]      
+        "season_id": season[0],
+        "season_name": season[1],
+        "start_date": season[2],
+        "end_date": season[3],
+        "free_agent_start": season[4],
+        "free_agent_end": season[5],
+        "leagues": [
+            {
+                "league_id": league[0],
+                "league_name": league[1]
+            }
+            for league in leagues
+        ]
     }
 
 # ------------------------------------------
