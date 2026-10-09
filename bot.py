@@ -5,6 +5,7 @@
 import os, discord
 from dotenv import load_dotenv
 from discord.ext import commands
+from views.playersView import RegistrationView
 
 # ------------------------------------------
 # To run the bot locally, run this:
@@ -36,6 +37,8 @@ coAdminRoleID = int(os.getenv("CO_ADMIN_ROLE_ID"))
 staffRoleID = int(os.getenv("STAFF_ROLE_ID"))
 managerRoleID = int(os.getenv("MANAGER_ROLE_ID"))
 asstManagerRoleID = int(os.getenv("ASST_MANAGER_ROLE_ID"))
+playerRoleID = int(os.getenv("PLAYER_ROLE_ID"))
+registeredRoleID = int(os.getenv("REGISTERED_ROLE_ID"))
 
 # ------------------------------------------
 # Bot-specific Variables
@@ -74,6 +77,8 @@ bot.coAdminRoleID = coAdminRoleID
 bot.staffRoleID = staffRoleID
 bot.manager_RoleID = managerRoleID
 bot.asstManagerRoleID = asstManagerRoleID
+bot.playerRoleID = playerRoleID
+bot.registeredRoleID = registeredRoleID
 
 bot.adminRoles = adminRoles
 bot.staffRoles = staffRoles
@@ -87,6 +92,10 @@ bot.managerRoles = managerRoles
 async def setup_hook():
     await bot.load_extension("cogs.seasonsCog")
     await bot.load_extension("cogs.leaguesCog")
+    await bot.load_extension("cogs.playersCog")
+
+
+    bot.add_view(RegistrationView(bot))
 
     await bot.tree.sync()
 # ------------------------------------------
