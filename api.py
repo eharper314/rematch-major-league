@@ -34,6 +34,13 @@ class Season(BaseModel):
 class League(BaseModel):
     league_name: str = Field(min_length = 1, max_length = 100)
 
+class Player(BaseModel):
+    discord_user_id: int
+    ign: str = Field(min_length = 1, max_length = 32)
+
+class PlayerIgnUpdate(BaseModel):
+    ign: str = Field(min_length = 1, max_length = 32)
+
 # ------------------------------------------
 # Starting endpoint for health check
 # ------------------------------------------
@@ -463,5 +470,285 @@ def update_league(league_id: int, league: League):
         raise HTTPException(
             status_code = 500,
             detail = "A database error has occurred while creating the league."
+        )
+
+# ------------------------------------------
+# Endpoint to register a player in RML.
+# ------------------------------------------
+
+@app.post("/players")
+def create_player(player: Player):
+
+    # ------------------------------------------
+    # Attempts to register the player
+    # ------------------------------------------
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO players (
+                        discord_user_id,
+                        ign
+                    )
+                    VALUES (%s, %s)
+                    RETURNING player_id;
+                    """,
+                    (
+                        player.discord_user_id,
+                        player.ign
+                    )
+                )
+
+                player_id = cur.fetchone()[0]
+
+        return {
+            "message": "Player has been registered successfully!",
+            "player_id": player_id
+        }
+
+    # ------------------------------------------
+    # Pops if the Discord account is already
+    # registered in RML.
+    # ------------------------------------------
+
+    except UniqueViolation:
+        raise HTTPException(
+            status_code = 409,
+            detail = "That Discord user is already registered in RML."
+        )
+
+    # ------------------------------------------
+    # Other errors not specifically caught
+    # ------------------------------------------
+
+    except DatabaseError as e:
+        print("DATABASE ERROR:", e)
+
+        raise HTTPException(
+            status_code = 500,
+            detail = "A database error has occurred while registering the player."
+        )
+
+
+# ------------------------------------------
+# Endpoint to get a player using their
+# Discord user ID.
+# ------------------------------------------
+
+@app.get("/players/discord/{discord_user_id}")
+def get_player_by_discord(discord_user_id: int):
+
+    # ------------------------------------------
+    # Attempts to find the player
+    # ------------------------------------------
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    player_id,
+                    discord_user_id,
+                    ign,
+                    registered_at,
+                    ign_updated_at
+                FROM players
+                WHERE discord_user_id = %s;
+                """,
+                (
+                    discord_user_id,
+                )
+            )
+
+            player = cur.fetchone()
+
+    # ------------------------------------------
+    # Pops if the player isn't registered
+    # ------------------------------------------
+
+    if player is None:
+        raise HTTPException(
+            status_code = 404,
+            detail = "Player not found."
+        )
+
+    # ------------------------------------------
+    # Returns the player's information
+    # ------------------------------------------
+
+    return {
+        "player_id": player[0],
+        "discord_user_id": player[1],
+        "ign": player[2],
+        "registered_at": player[3],
+        "ign_updated_at": player[4]
+    }
+
+
+# ------------------------------------------
+# Endpoint for a player to update their IGN.
+# ------------------------------------------
+
+@app.patch("/players/{player_id}/ign")
+def update_player_ign(
+    player_id: int,
+    player: PlayerIgnUpdate
+):
+
+    # ------------------------------------------
+    # Attempts to update the player's IGN
+    # ------------------------------------------
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+
+                # ------------------------------------------
+                # Gets the player's current IGN update
+                # information.
+                # ------------------------------------------
+
+                cur.execute(
+                    """
+                    SELECT
+                        player_id,
+                        ign_updated_at,
+                        (
+                            ign_updated_at IS NULL
+                            OR ign_updated_at <= CURRENT_TIMESTAMP - INTERVAL '7 days'
+                        ) AS can_update
+                    FROM players
+                    WHERE player_id = %s;
+                    """,
+                    (
+                        player_id,
+                    )
+                )
+
+                current_player = cur.fetchone()
+
+                # ------------------------------------------
+                # Pops if the player ID isn't found
+                # ------------------------------------------
+
+                if current_player is None:
+                    raise HTTPException(
+                        status_code = 404,
+                        detail = "That specified player does not exist."
+                    )
+
+                # ------------------------------------------
+                # Checks to see if the player is still
+                # within the IGN update cooldown.
+                # ------------------------------------------
+
+                if not current_player[2]:
+                    raise HTTPException(
+                        status_code = 429,
+                        detail = (
+                            "You can only update your IGN once every 7 days."
+                        )
+                    )
+
+                # ------------------------------------------
+                # Updates the player's IGN
+                # ------------------------------------------
+
+                cur.execute(
+                    """
+                    UPDATE players
+                    SET
+                        ign = %s,
+                        ign_updated_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE player_id = %s
+                    RETURNING player_id;
+                    """,
+                    (
+                        player.ign,
+                        player_id
+                    )
+                )
+
+                updated_player = cur.fetchone()
+
+        return {
+            "message": "Player IGN has been updated successfully!",
+            "player_id": updated_player[0]
+        }
+
+    # ------------------------------------------
+    # Other errors not specifically caught
+    # ------------------------------------------
+
+    except DatabaseError as e:
+        print("DATABASE ERROR:", e)
+
+        raise HTTPException(
+            status_code = 500,
+            detail = "A database error has occurred while updating the player's IGN."
+        )
+
+# ------------------------------------------
+# Endpoint for staff to update a player's IGN.
+# ------------------------------------------
+
+@app.patch("/staff/players/{player_id}/ign")
+def staff_update_player_ign(
+    player_id: int,
+    player: PlayerIgnUpdate
+):
+
+    # ------------------------------------------
+    # Attempts to update the player's IGN
+    # ------------------------------------------
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE players
+                    SET
+                        ign = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE player_id = %s
+                    RETURNING player_id;
+                    """,
+                    (
+                        player.ign,
+                        player_id
+                    )
+                )
+
+                updated_player = cur.fetchone()
+
+                # ------------------------------------------
+                # Pops if the player ID isn't found
+                # ------------------------------------------
+
+                if updated_player is None:
+                    raise HTTPException(
+                        status_code = 404,
+                        detail = "That specified player does not exist."
+                    )
+
+        return {
+            "message": "Player IGN has been updated successfully!",
+            "player_id": updated_player[0]
+        }
+
+    # ------------------------------------------
+    # Other errors not specifically caught
+    # ------------------------------------------
+
+    except DatabaseError as e:
+        print("DATABASE ERROR:", e)
+
+        raise HTTPException(
+            status_code = 500,
+            detail = "A database error has occurred while updating the player's IGN."
         )
 

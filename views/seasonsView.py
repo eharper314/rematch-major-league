@@ -467,7 +467,7 @@ class CreateSeasonView(discord.ui.View):
             self.confirm_create_season.label = "Update Season"
 
     # ------------------------------------------
-    # Funtion to edit the date format
+    # Function to edit the date format
     # ------------------------------------------
 
     def format_date(self, value):
