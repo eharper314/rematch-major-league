@@ -578,7 +578,7 @@ def build_player_embed(
         value = (
             f"**Standing:** {standing}\n"
             f"**Warning Amount:** "
-            f"{player.get('warning_points', 0)}\n"
+            f"{player.get('warning_amount', 0)}\n"
             f"**Current Warnings:** "
             f"{player.get('current_warnings', 0)}"
         ),
@@ -605,14 +605,9 @@ def build_player_embed(
         for warning in warnings:
 
             warning_text += (
-                f"**{warning['warning_type']}** "
-                f"— {warning['points']} point"
+                f"**ID {warning['warning_id']} "
+                f"— {warning['warning_type']}**\n"
             )
-
-            if warning["points"] != 1:
-                warning_text += "s"
-
-            warning_text += "\n"
 
             if warning.get("reason"):
 
@@ -664,7 +659,8 @@ def build_player_embed(
         for ban in bans:
 
             ban_text += (
-                f"**{ban.get('reason', 'No reason provided.')}**\n"
+                f"**ID {ban['ban_id']}**\n"
+                f"{ban.get('reason', 'No reason provided.')}\n"
             )
 
             if ban.get("expires_at"):
