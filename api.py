@@ -4,7 +4,7 @@
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from datetime import date
+from datetime import date, datetime
 from dbconn import get_connection
 from psycopg.errors import CheckViolation, DatabaseError, ForeignKeyViolation, UniqueViolation
 
@@ -40,6 +40,15 @@ class Player(BaseModel):
 
 class PlayerIgnUpdate(BaseModel):
     ign: str = Field(min_length = 1, max_length = 32)
+
+class PlayerWarning(BaseModel):
+    warning_type: str = Field(min_length = 1, max_length = 100)
+    reason: str = Field(min_length = 1)
+    expires_at: datetime | None = None
+
+class PlayerBan(BaseModel):
+    reason: str = Field(min_length = 1)
+    expires_at: datetime | None = None
 
 # ------------------------------------------
 # Starting endpoint for health check
@@ -750,5 +759,496 @@ def staff_update_player_ign(
         raise HTTPException(
             status_code = 500,
             detail = "A database error has occurred while updating the player's IGN."
+        )
+
+# ------------------------------------------
+# Endpoint to give a player a warning.
+# ------------------------------------------
+
+@app.post("/players/{player_id}/warnings")
+def create_player_warning(
+    player_id: int,
+    warning: PlayerWarning
+):
+
+    # ------------------------------------------
+    # Attempts to give the player a warning
+    # ------------------------------------------
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+
+                # ------------------------------------------
+                # Checks to see if the player exists
+                # ------------------------------------------
+
+                cur.execute(
+                    """
+                    SELECT player_id
+                    FROM players
+                    WHERE player_id = %s;
+                    """,
+                    (
+                        player_id,
+                    )
+                )
+
+                player = cur.fetchone()
+
+                if player is None:
+                    raise HTTPException(
+                        status_code = 404,
+                        detail = "That specified player does not exist."
+                    )
+
+                # ------------------------------------------
+                # Creates the warning
+                # ------------------------------------------
+
+                cur.execute(
+                    """
+                    INSERT INTO player_warnings (
+                        player_id,
+                        warning_type,
+                        reason,
+                        expires_at
+                    )
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING warning_id;
+                    """,
+                    (
+                        player_id,
+                        warning.warning_type,
+                        warning.reason,
+                        warning.expires_at
+                    )
+                )
+
+                warning_id = cur.fetchone()[0]
+
+        return {
+            "message": "Player warning has been created successfully!",
+            "warning_id": warning_id
+        }
+
+    # ------------------------------------------
+    # Other errors not specifically caught
+    # ------------------------------------------
+
+    except DatabaseError as e:
+        print("DATABASE ERROR:", e)
+
+        raise HTTPException(
+            status_code = 500,
+            detail = "A database error has occurred while warning the player."
+        )
+
+
+# ------------------------------------------
+# Endpoint to get a player's active warnings.
+# ------------------------------------------
+
+@app.get("/players/{player_id}/warnings")
+def get_player_warnings(player_id: int):
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+
+            # ------------------------------------------
+            # Checks to see if the player exists
+            # ------------------------------------------
+
+            cur.execute(
+                """
+                SELECT player_id
+                FROM players
+                WHERE player_id = %s;
+                """,
+                (
+                    player_id,
+                )
+            )
+
+            player = cur.fetchone()
+
+            if player is None:
+                raise HTTPException(
+                    status_code = 404,
+                    detail = "That specified player does not exist."
+                )
+
+            # ------------------------------------------
+            # Gets the lifetime warning amount
+            # ------------------------------------------
+
+            cur.execute(
+                """
+                SELECT COUNT(*)
+                FROM player_warnings
+                WHERE player_id = %s;
+                """,
+                (
+                    player_id,
+                )
+            )
+
+            warning_amount = cur.fetchone()[0]
+
+            # ------------------------------------------
+            # Gets all current warnings
+            # ------------------------------------------
+
+            cur.execute(
+                """
+                SELECT
+                    warning_id,
+                    warning_type,
+                    reason,
+                    issued_at,
+                    expires_at
+                FROM player_warnings
+                WHERE player_id = %s
+                AND removed_at IS NULL
+                AND (
+                    expires_at IS NULL
+                    OR expires_at > CURRENT_TIMESTAMP
+                )
+                ORDER BY issued_at DESC;
+                """,
+                (
+                    player_id,
+                )
+            )
+
+            warnings = cur.fetchall()
+
+    return {
+        "player_id": player_id,
+        "warning_amount": warning_amount,
+        "current_warnings": len(warnings),
+        "warnings": [
+            {
+                "warning_id": warning[0],
+                "warning_type": warning[1],
+                "reason": warning[2],
+                "issued_at": warning[3],
+                "expires_at": warning[4]
+            }
+            for warning in warnings
+        ]
+    }
+
+# ------------------------------------------
+# Endpoint to remove a player's warning.
+# ------------------------------------------
+
+@app.patch("/warnings/{warning_id}/remove")
+def remove_player_warning(warning_id: int):
+
+    # ------------------------------------------
+    # Attempts to remove the warning
+    # ------------------------------------------
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE player_warnings
+                    SET
+                        removed_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE warning_id = %s
+                    AND removed_at IS NULL
+                    RETURNING warning_id;
+                    """,
+                    (
+                        warning_id,
+                    )
+                )
+
+                removed_warning = cur.fetchone()
+
+                # ------------------------------------------
+                # Pops if the warning ID isn't found
+                # ------------------------------------------
+
+                if removed_warning is None:
+                    raise HTTPException(
+                        status_code = 404,
+                        detail = (
+                            "That warning does not exist or has "
+                            "already been removed."
+                        )
+                    )
+
+        return {
+            "message": "Player warning has been removed successfully!",
+            "warning_id": removed_warning[0]
+        }
+
+    # ------------------------------------------
+    # Other errors not specifically caught
+    # ------------------------------------------
+
+    except DatabaseError as e:
+        print("DATABASE ERROR:", e)
+
+        raise HTTPException(
+            status_code = 500,
+            detail = "A database error has occurred while removing the warning."
+        )
+
+# ------------------------------------------
+# Endpoint to ban a player in RML.
+# ------------------------------------------
+
+@app.post("/players/{player_id}/bans")
+def create_player_ban(
+    player_id: int,
+    ban: PlayerBan
+):
+
+    # ------------------------------------------
+    # Attempts to ban the player
+    # ------------------------------------------
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+
+                # ------------------------------------------
+                # Checks to see if the player exists
+                # ------------------------------------------
+
+                cur.execute(
+                    """
+                    SELECT player_id
+                    FROM players
+                    WHERE player_id = %s;
+                    """,
+                    (
+                        player_id,
+                    )
+                )
+
+                player = cur.fetchone()
+
+                if player is None:
+                    raise HTTPException(
+                        status_code = 404,
+                        detail = "That specified player does not exist."
+                    )
+
+                # ------------------------------------------
+                # Checks to see if the player is already
+                # actively banned.
+                # ------------------------------------------
+
+                cur.execute(
+                    """
+                    SELECT ban_id
+                    FROM player_bans
+                    WHERE player_id = %s
+                    AND lifted_at IS NULL
+                    AND (
+                        expires_at IS NULL
+                        OR expires_at > CURRENT_TIMESTAMP
+                    )
+                    LIMIT 1;
+                    """,
+                    (
+                        player_id,
+                    )
+                )
+
+                active_ban = cur.fetchone()
+
+                if active_ban is not None:
+                    raise HTTPException(
+                        status_code = 409,
+                        detail = "That player is already actively banned."
+                    )
+
+                # ------------------------------------------
+                # Creates the ban
+                # ------------------------------------------
+
+                cur.execute(
+                    """
+                    INSERT INTO player_bans (
+                        player_id,
+                        reason,
+                        expires_at
+                    )
+                    VALUES (%s, %s, %s)
+                    RETURNING ban_id;
+                    """,
+                    (
+                        player_id,
+                        ban.reason,
+                        ban.expires_at
+                    )
+                )
+
+                ban_id = cur.fetchone()[0]
+
+        return {
+            "message": "Player has been banned successfully!",
+            "ban_id": ban_id
+        }
+
+    # ------------------------------------------
+    # Other errors not specifically caught
+    # ------------------------------------------
+
+    except DatabaseError as e:
+        print("DATABASE ERROR:", e)
+
+        raise HTTPException(
+            status_code = 500,
+            detail = "A database error has occurred while banning the player."
+        )
+
+
+# ------------------------------------------
+# Endpoint to get a player's active bans.
+# ------------------------------------------
+
+@app.get("/players/{player_id}/bans")
+def get_player_bans(player_id: int):
+
+    # ------------------------------------------
+    # Pulls the player's active bans
+    # ------------------------------------------
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+
+            # ------------------------------------------
+            # Checks to see if the player exists
+            # ------------------------------------------
+
+            cur.execute(
+                """
+                SELECT player_id
+                FROM players
+                WHERE player_id = %s;
+                """,
+                (
+                    player_id,
+                )
+            )
+
+            player = cur.fetchone()
+
+            if player is None:
+                raise HTTPException(
+                    status_code = 404,
+                    detail = "That specified player does not exist."
+                )
+
+            # ------------------------------------------
+            # Gets all active bans
+            # ------------------------------------------
+
+            cur.execute(
+                """
+                SELECT
+                    ban_id,
+                    reason,
+                    banned_at,
+                    expires_at
+                FROM player_bans
+                WHERE player_id = %s
+                AND lifted_at IS NULL
+                AND (
+                    expires_at IS NULL
+                    OR expires_at > CURRENT_TIMESTAMP
+                )
+                ORDER BY banned_at DESC;
+                """,
+                (
+                    player_id,
+                )
+            )
+
+            bans = cur.fetchall()
+
+    return {
+        "player_id": player_id,
+        "is_banned": len(bans) > 0,
+        "bans": [
+            {
+                "ban_id": ban[0],
+                "reason": ban[1],
+                "banned_at": ban[2],
+                "expires_at": ban[3]
+            }
+            for ban in bans
+        ]
+    }
+
+
+# ------------------------------------------
+# Endpoint to lift a player's ban.
+# ------------------------------------------
+
+@app.patch("/bans/{ban_id}/lift")
+def lift_player_ban(ban_id: int):
+
+    # ------------------------------------------
+    # Attempts to lift the ban
+    # ------------------------------------------
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE player_bans
+                    SET
+                        lifted_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE ban_id = %s
+                    AND lifted_at IS NULL
+                    RETURNING ban_id;
+                    """,
+                    (
+                        ban_id,
+                    )
+                )
+
+                lifted_ban = cur.fetchone()
+
+                # ------------------------------------------
+                # Pops if the ban ID isn't found
+                # ------------------------------------------
+
+                if lifted_ban is None:
+                    raise HTTPException(
+                        status_code = 404,
+                        detail = (
+                            "That ban does not exist or has "
+                            "already been lifted."
+                        )
+                    )
+
+        return {
+            "message": "Player ban has been lifted successfully!",
+            "ban_id": lifted_ban[0]
+        }
+
+    # ------------------------------------------
+    # Other errors not specifically caught
+    # ------------------------------------------
+
+    except DatabaseError as e:
+        print("DATABASE ERROR:", e)
+
+        raise HTTPException(
+            status_code = 500,
+            detail = "A database error has occurred while lifting the ban."
         )
 

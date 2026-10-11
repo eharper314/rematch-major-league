@@ -153,6 +153,79 @@ class Players(commands.Cog):
 
                     return
 
+            # ------------------------------------------
+            # Gets the player's warning information
+            # ------------------------------------------
+
+            async with session.get(
+                (
+                    f"{self.bot.apiURL}/players/"
+                    f"{data['player_id']}/warnings"
+                )
+            ) as response:
+
+                warning_data = await response.json()
+
+                # ------------------------------------------
+                # Error handling
+                # ------------------------------------------
+
+                if response.status != 200:
+
+                    await interaction.followup.send(
+                        warning_data.get(
+                            "detail",
+                            "Something went wrong."
+                        ),
+                        ephemeral = True
+                    )
+
+                    return
+
+            # ------------------------------------------
+            # Gets the player's ban information
+            # ------------------------------------------
+
+            async with session.get(
+                (
+                    f"{self.bot.apiURL}/players/"
+                    f"{data['player_id']}/bans"
+                )
+            ) as response:
+
+                ban_data = await response.json()
+
+                # ------------------------------------------
+                # Error handling
+                # ------------------------------------------
+
+                if response.status != 200:
+
+                    await interaction.followup.send(
+                        ban_data.get(
+                            "detail",
+                            "Something went wrong."
+                        ),
+                        ephemeral = True
+                    )
+
+                    return
+
+        # ------------------------------------------
+        # Adds warning information to the player
+        # ------------------------------------------
+
+        data["warning_amount"] = warning_data["warning_amount"]
+        data["current_warnings"] = warning_data["current_warnings"]
+        data["warnings"] = warning_data["warnings"]
+
+        # ------------------------------------------
+        # Adds ban information to the player
+        # ------------------------------------------
+
+        data["is_banned"] = ban_data["is_banned"]
+        data["bans"] = ban_data["bans"]
+
         # ------------------------------------------
         # Command response
         # ------------------------------------------
@@ -353,6 +426,523 @@ class Players(commands.Cog):
             name = "New IGN",
             value = new_ign,
             inline = True
+        )
+
+        await interaction.followup.send(
+            embed = embed,
+            ephemeral = True
+        )
+
+    # ------------------------------------------
+    # Command for warning a player
+    # ------------------------------------------
+
+    @app_commands.command(
+        name = "warn_player",
+        description = "STAFF COMMAND: Gives an RML player a warning."
+    )
+    async def warn_player(
+        self,
+        interaction: discord.Interaction,
+        player: discord.Member,
+        warning_type: str,
+        reason: str
+    ):
+        # ------------------------------------------
+        # Sets required variables
+        # ------------------------------------------
+
+        user_role_ids = [
+            role.id
+            for role in interaction.user.roles
+        ]
+
+        # ------------------------------------------
+        # Checks to see if the user has permissions
+        # ------------------------------------------
+
+        if not any(
+            role_id in self.bot.staffRoles
+            for role_id in user_role_ids
+        ):
+            await interaction.response.send_message(
+                "You do not have permission to use this command.",
+                ephemeral = True
+            )
+            return
+
+
+        # ------------------------------------------
+        # Instant response so no timing out
+        # ------------------------------------------
+
+        await interaction.response.defer(
+            ephemeral = True
+        )
+
+        # ------------------------------------------
+        # Attempts to get the player information
+        # ------------------------------------------
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{self.bot.apiURL}/players/discord/{player.id}"
+            ) as response:
+
+                data = await response.json()
+
+                # ------------------------------------------
+                # Player is not registered
+                # ------------------------------------------
+
+                if response.status == 404:
+
+                    await interaction.followup.send(
+                        (
+                            f"{player.mention} is not currently "
+                            f"registered in RML."
+                        ),
+                        ephemeral = True
+                    )
+
+                    return
+
+                # ------------------------------------------
+                # Error handling
+                # ------------------------------------------
+
+                if response.status != 200:
+
+                    await interaction.followup.send(
+                        data.get(
+                            "detail",
+                            "Something went wrong."
+                        ),
+                        ephemeral = True
+                    )
+
+                    return
+
+            # ------------------------------------------
+            # Sets required variables
+            # ------------------------------------------
+
+            player_id = data["player_id"]
+            player_ign = data["ign"]
+
+            payload = {
+                "warning_type": warning_type,
+                "reason": reason,
+                "expires_at": None
+            }
+
+            # ------------------------------------------
+            # Attempts to warn the player
+            # ------------------------------------------
+
+            async with session.post(
+                (
+                    f"{self.bot.apiURL}/players/"
+                    f"{player_id}/warnings"
+                ),
+                json = payload
+            ) as response:
+
+                data = await response.json()
+
+                # ------------------------------------------
+                # Error handling
+                # ------------------------------------------
+
+                if response.status != 200:
+
+                    await interaction.followup.send(
+                        data.get(
+                            "detail",
+                            "Something went wrong."
+                        ),
+                        ephemeral = True
+                    )
+
+                    return
+
+        # ------------------------------------------
+        # Command response
+        # ------------------------------------------
+
+        embed = discord.Embed(
+            title = "Player Warned",
+            description = (
+                f"{player.mention} has received an RML warning."
+            )
+        )
+
+        embed.add_field(
+            name = "Player",
+            value = player_ign,
+            inline = False
+        )
+
+        embed.add_field(
+            name = "Warning Type",
+            value = warning_type,
+            inline = False
+        )
+
+        embed.add_field(
+            name = "Reason",
+            value = reason,
+            inline = False
+        )
+
+        embed.add_field(
+            name = "Warning ID",
+            value = data["warning_id"],
+            inline = False
+        )
+
+        await interaction.followup.send(
+            embed = embed,
+            ephemeral = True
+        )
+
+    # ------------------------------------------
+    # Command for removing a player warning
+    # ------------------------------------------
+
+    @app_commands.command(
+        name = "remove_warning",
+        description = "STAFF COMMAND: Removes an active player warning."
+    )
+    async def remove_warning(
+        self,
+        interaction: discord.Interaction,
+        warning_id: int
+    ):
+        # ------------------------------------------
+        # Sets required variables
+        # ------------------------------------------
+
+        user_role_ids = [
+            role.id
+            for role in interaction.user.roles
+        ]
+
+        # ------------------------------------------
+        # Checks to see if the user has permissions
+        # ------------------------------------------
+
+        if not any(
+            role_id in self.bot.staffRoles
+            for role_id in user_role_ids
+        ):
+            await interaction.response.send_message(
+                "You do not have permission to use this command.",
+                ephemeral = True
+            )
+            return
+
+        # ------------------------------------------
+        # Instant response so no timing out
+        # ------------------------------------------
+
+        await interaction.response.defer(
+            ephemeral = True
+        )
+
+        # ------------------------------------------
+        # Attempts to remove the warning
+        # ------------------------------------------
+
+        async with aiohttp.ClientSession() as session:
+            async with session.patch(
+                (
+                    f"{self.bot.apiURL}/warnings/"
+                    f"{warning_id}/remove"
+                )
+            ) as response:
+
+                data = await response.json()
+
+                # ------------------------------------------
+                # Error handling
+                # ------------------------------------------
+
+                if response.status != 200:
+
+                    await interaction.followup.send(
+                        data.get(
+                            "detail",
+                            "Something went wrong."
+                        ),
+                        ephemeral = True
+                    )
+
+                    return
+
+        # ------------------------------------------
+        # Command response
+        # ------------------------------------------
+
+        embed = discord.Embed(
+            title = "Warning Removed",
+            description = (
+                f"Warning ID **{warning_id}** has been removed."
+            )
+        )
+
+        await interaction.followup.send(
+            embed = embed,
+            ephemeral = True
+        )    
+
+    # ------------------------------------------
+    # Command for banning a player
+    # ------------------------------------------
+
+    @app_commands.command(
+        name = "ban_player",
+        description = "STAFF COMMAND: Bans an RML player."
+    )
+    async def ban_player(
+        self,
+        interaction: discord.Interaction,
+        player: discord.Member,
+        reason: str
+    ):
+        # ------------------------------------------
+        # Sets required variables
+        # ------------------------------------------
+
+        user_role_ids = [
+            role.id
+            for role in interaction.user.roles
+        ]
+
+        # ------------------------------------------
+        # Checks to see if the user has permissions
+        # ------------------------------------------
+
+        if not any(
+            role_id in self.bot.staffRoles
+            for role_id in user_role_ids
+        ):
+            await interaction.response.send_message(
+                "You do not have permission to use this command.",
+                ephemeral = True
+            )
+            return
+
+        # ------------------------------------------
+        # Instant response so no timing out
+        # ------------------------------------------
+
+        await interaction.response.defer(
+            ephemeral = True
+        )
+
+        # ------------------------------------------
+        # Attempts to get the player information
+        # ------------------------------------------
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{self.bot.apiURL}/players/discord/{player.id}"
+            ) as response:
+
+                data = await response.json()
+
+                # ------------------------------------------
+                # Player is not registered
+                # ------------------------------------------
+
+                if response.status == 404:
+
+                    await interaction.followup.send(
+                        (
+                            f"{player.mention} is not currently "
+                            f"registered in RML."
+                        ),
+                        ephemeral = True
+                    )
+
+                    return
+
+                # ------------------------------------------
+                # Error handling
+                # ------------------------------------------
+
+                if response.status != 200:
+
+                    await interaction.followup.send(
+                        data.get(
+                            "detail",
+                            "Something went wrong."
+                        ),
+                        ephemeral = True
+                    )
+
+                    return
+
+            # ------------------------------------------
+            # Sets required variables
+            # ------------------------------------------
+
+            player_id = data["player_id"]
+            player_ign = data["ign"]
+
+            payload = {
+                "reason": reason,
+                "expires_at": None
+            }
+
+            # ------------------------------------------
+            # Attempts to ban the player
+            # ------------------------------------------
+
+            async with session.post(
+                (
+                    f"{self.bot.apiURL}/players/"
+                    f"{player_id}/bans"
+                ),
+                json = payload
+            ) as response:
+
+                data = await response.json()
+
+                # ------------------------------------------
+                # Error handling
+                # ------------------------------------------
+
+                if response.status != 200:
+
+                    await interaction.followup.send(
+                        data.get(
+                            "detail",
+                            "Something went wrong."
+                        ),
+                        ephemeral = True
+                    )
+
+                    return
+
+        # ------------------------------------------
+        # Command response
+        # ------------------------------------------
+
+        embed = discord.Embed(
+            title = "Player Banned",
+            description = (
+                f"{player.mention} has been banned from RML."
+            )
+        )
+
+        embed.add_field(
+            name = "Player",
+            value = player_ign,
+            inline = False
+        )
+
+        embed.add_field(
+            name = "Reason",
+            value = reason,
+            inline = False
+        )
+
+        embed.add_field(
+            name = "Ban ID",
+            value = data["ban_id"],
+            inline = False
+        )
+
+        await interaction.followup.send(
+            embed = embed,
+            ephemeral = True
+        )
+
+    # ------------------------------------------
+    # Command for lifting a player ban
+    # ------------------------------------------
+
+    @app_commands.command(
+        name = "unban_player",
+        description = "STAFF COMMAND: Lifts an active player ban."
+    )
+    async def unban_player(
+        self,
+        interaction: discord.Interaction,
+        ban_id: int
+    ):
+        # ------------------------------------------
+        # Sets required variables
+        # ------------------------------------------
+
+        user_role_ids = [
+            role.id
+            for role in interaction.user.roles
+        ]
+
+        # ------------------------------------------
+        # Checks to see if the user has permissions
+        # ------------------------------------------
+
+        if not any(
+            role_id in self.bot.staffRoles
+            for role_id in user_role_ids
+        ):
+            await interaction.response.send_message(
+                "You do not have permission to use this command.",
+                ephemeral = True
+            )
+            return
+
+        # ------------------------------------------
+        # Instant response so no timing out
+        # ------------------------------------------
+
+        await interaction.response.defer(
+            ephemeral = True
+        )
+
+        # ------------------------------------------
+        # Attempts to lift the player's ban
+        # ------------------------------------------
+
+        async with aiohttp.ClientSession() as session:
+            async with session.patch(
+                (
+                    f"{self.bot.apiURL}/bans/"
+                    f"{ban_id}/lift"
+                )
+            ) as response:
+
+                data = await response.json()
+
+                # ------------------------------------------
+                # Error handling
+                # ------------------------------------------
+
+                if response.status != 200:
+
+                    await interaction.followup.send(
+                        data.get(
+                            "detail",
+                            "Something went wrong."
+                        ),
+                        ephemeral = True
+                    )
+
+                    return
+
+        # ------------------------------------------
+        # Command response
+        # ------------------------------------------
+
+        embed = discord.Embed(
+            title = "Player Unbanned",
+            description = (
+                f"Ban ID **{ban_id}** has been lifted."
+            )
         )
 
         await interaction.followup.send(
